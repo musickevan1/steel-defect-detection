@@ -9,10 +9,10 @@ First, prepare your project for upload:
 1. Zip the entire project directory:
    ```bash
    # On Windows
-   Compress-Archive -Path "C:\Users\diane\OneDrive\Desktop\MSU\MSU Spring 25\CSC 573 - Deep Learning\Final Project" -DestinationPath "steel_defect_project.zip"
+   Compress-Archive -Path "C:\path\to\project\folder" -DestinationPath "steel_defect_project.zip"
    
    # On Linux/Mac
-   zip -r steel_defect_project.zip "Final Project"
+   zip -r steel_defect_project.zip "path/to/project/folder"
    ```
 
 2. Make sure your zip file includes:
