@@ -42,15 +42,14 @@ val_test_transform = transforms.Compose([
 ])
 
 # Implement data loading and splitting logic
-def load_data(base_path=DATASET_PATH, batch_size=32, val_split=0.5, random_seed=42):
+def load_data(base_path=DATASET_PATH, batch_size=32, random_seed=42):
     """
-    Loads the NEU-DET dataset using ImageFolder, splits validation set into validation and test sets,
-    and returns DataLoaders.
+    Loads the NEU-DET dataset using ImageFolder, combines all images, and splits into
+    train (50%), validation (20%), and test (30%) sets as required by the project.
 
     Args:
         base_path (str): Path to the NEU-DET directory.
         batch_size (int): Batch size for DataLoaders.
-        val_split (float): Proportion of the original validation set to use for the new validation set (rest goes to test).
         random_seed (int): Random seed for reproducible splits.
 
     Returns:
@@ -71,41 +70,91 @@ def load_data(base_path=DATASET_PATH, batch_size=32, val_split=0.5, random_seed=
         else:
             return None, None, None, None, None
 
-    print(f"Loading training data from: {train_dir}")
-    print(f"Loading validation/test data from: {val_dir}")
+    print(f"Loading data from: {train_dir} and {val_dir}")
 
-    # Load datasets using ImageFolder
-    train_dataset = datasets.ImageFolder(train_dir, transform=train_transform)
-    # Load the original validation dataset (will be split)
-    full_val_dataset = datasets.ImageFolder(val_dir, transform=val_test_transform)
-
-    class_names = train_dataset.classes
+    # First, get all image paths and labels from both directories
+    all_image_paths = []
+    all_labels = []
+    class_names = []
+    
+    # Get class names from train directory
+    class_names = sorted([d for d in os.listdir(train_dir) if os.path.isdir(os.path.join(train_dir, d))])
+    class_to_idx = {cls_name: i for i, cls_name in enumerate(class_names)}
+    
+    # Collect images from train directory
+    for class_name in class_names:
+        class_dir = os.path.join(train_dir, class_name)
+        for fname in os.listdir(class_dir):
+            if fname.lower().endswith(('.png', '.jpg', '.jpeg')):
+                all_image_paths.append(os.path.join(class_dir, fname))
+                all_labels.append(class_to_idx[class_name])
+    
+    # Collect images from validation directory
+    for class_name in class_names:
+        class_dir = os.path.join(val_dir, class_name)
+        if os.path.isdir(class_dir):  # Make sure the class directory exists
+            for fname in os.listdir(class_dir):
+                if fname.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    all_image_paths.append(os.path.join(class_dir, fname))
+                    all_labels.append(class_to_idx[class_name])
+    
     print(f"Classes found: {class_names}")
-    print(f"Number of training images: {len(train_dataset)}")
-    print(f"Number of validation/test images: {len(full_val_dataset)}")
-
-    # Split the original validation set into new validation and test sets
-    total_val_size = len(full_val_dataset)
-    val_size = int(total_val_size * val_split)
-    test_size = total_val_size - val_size
-
-    if val_size == 0 or test_size == 0:
-         print(f"Warning: Validation split resulted in zero samples for validation ({val_size}) or test ({test_size}). Adjust val_split.")
-         # Defaulting to using the full set as validation and having no test set for now
-         val_dataset = full_val_dataset
-         test_dataset = None
-         print("Using full original validation set as validation. No test set created.")
-    else:
-        val_dataset, test_dataset = random_split(full_val_dataset, [val_size, test_size],
-                                                 generator=torch.Generator().manual_seed(random_seed))
-        print(f"Split validation data into: {len(val_dataset)} validation samples, {len(test_dataset)} test samples.")
-
+    print(f"Total number of images: {len(all_image_paths)}")
+    
+    # Create a custom dataset
+    class CustomDataset(torch.utils.data.Dataset):
+        def __init__(self, image_paths, labels, transform=None):
+            self.image_paths = image_paths
+            self.labels = labels
+            self.transform = transform
+            
+        def __len__(self):
+            return len(self.image_paths)
+            
+        def __getitem__(self, idx):
+            img_path = self.image_paths[idx]
+            label = self.labels[idx]
+            
+            # Load image
+            img = Image.open(img_path).convert('RGB')
+            
+            # Apply transformations
+            if self.transform:
+                img = self.transform(img)
+                
+            return img, label
+    
+    # Create full dataset
+    full_dataset = CustomDataset(all_image_paths, all_labels, transform=val_test_transform)
+    
+    # Calculate split sizes (50% train, 20% validation, 30% test)
+    total_size = len(full_dataset)
+    train_size = int(0.5 * total_size)
+    val_size = int(0.2 * total_size)
+    test_size = total_size - train_size - val_size
+    
+    # Split the dataset
+    train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(
+        full_dataset,
+        [train_size, val_size, test_size],
+        generator=torch.Generator().manual_seed(random_seed)
+    )
+    
+    # Apply different transforms to train dataset
+    train_dataset = CustomDataset(
+        [all_image_paths[i] for i in train_dataset.indices],
+        [all_labels[i] for i in train_dataset.indices],
+        transform=train_transform
+    )
+    
+    print(f"Split data into: {len(train_dataset)} training samples (50%), "
+          f"{len(val_dataset)} validation samples (20%), "
+          f"{len(test_dataset)} test samples (30%)")
 
     # Create DataLoaders
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True) if test_dataset else None
-
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
 
     return train_loader, val_loader, test_loader, test_dataset, class_names
 
@@ -205,7 +254,7 @@ if __name__ == '__main__':
     # Example usage: Test data loading
     print("\n--- Testing Data Loading ---")
     BATCH_SIZE = 16 # Smaller batch size for testing
-    train_loader, val_loader, test_loader, class_names = load_data(batch_size=BATCH_SIZE)
+    train_loader, val_loader, test_loader, test_dataset, class_names = load_data(batch_size=BATCH_SIZE)
 
     # Perform EDA
     print("\n--- Performing EDA ---")
