@@ -1,0 +1,65 @@
+
+# steel-defect-detection-final.roo
+
+[init]
+Create a GitHub repository named `steel-defect-detection`.
+
+[structure]
+- CSC_573_Final_Project_Code/
+- config/
+- data/
+- logs/
+- NEU-DET/
+- Progress_Report/
+- Proposal/
+- requirements.txt
+- results/
+- runpod/
+- saved_models/
+- scripts/
+- src/
+
+[move]
+Move all files and subfolders as listed in the provided codebase analysis report under the appropriate directory.
+Use the original file paths and preserve subdirectories (e.g., src/models, logs/debug, NEU-DET/train/images).
+
+[content:README.md]
+# Steel Defect Detection – Final Project (CSC 537)
+
+This project implements a deep learning and traditional ML pipeline for classifying steel surface defects using the NEU-DET dataset.
+
+## Key Features
+- ✅ ResNet18-based CNN with PyTorch and PyTorch Lightning
+- ✅ Enhanced traditional ML classifiers with HOG and LBP features
+- ✅ Full training, evaluation, and analysis pipelines
+- ✅ Visualizations of misclassifications and confusion matrices
+- ✅ Failure case analysis and logging
+- ✅ Cloud deployment scripts for RunPod
+
+## How to Run
+
+1. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+2. Run model training:
+```bash
+python CSC_573_Final_Project_Code/train_lightning.py
+```
+
+3. Evaluate:
+```bash
+python CSC_573_Final_Project_Code/final_test_evaluation.py
+```
+
+## Dataset
+Uses NEU-DET (pre-loaded in `NEU-DET/`). Ensure data paths match those in `config/paths.py`.
+
+## Author
+Evan Musick  
+Missouri State University
+
+[git]
+Initialize a local git repository.
+Make a commit with message: "Final submission – Steel Defect Detection (CSC 537)"
